@@ -1,12 +1,55 @@
 import * as dotenv from 'dotenv'
 import WebSocket from 'ws'
 import { question } from 'readline-sync'
+import { OpenAIEmbeddings } from '@langchain/openai'
+import { PineconeStore } from '@langchain/pinecone'
+import { Pinecone as PineconeClient } from '@pinecone-database/pinecone'
+import { Document } from '@langchain/core/documents'
 
 dotenv.config()
 
-const openAIKey = process.env.OPEN_AI_KEY
+const openAIKey = process.env.OPENAI_API_KEY
+const pineconeKey = process.env.PINECONE_KEY
+const indexName = process.env.PINECONE_INDEX
 const url =
   'wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-10-01'
+const embeddings = new OpenAIEmbeddings({
+  model: 'text-embedding-3-small',
+})
+
+const createPineconeIndex = async () => {
+  const pinecone = new PineconeClient()
+  const pineconeIndex = pinecone.Index(indexName)
+
+  const vectorStore = await PineconeStore.fromExistingIndex(embeddings, {
+    pineconeIndex,
+    maxConcurrency: 5,
+  })
+
+  const document1 = {
+    pageContent: 'The powerhouse of the cell is the mitochondria',
+    metadata: { source: 'https://example.com' },
+  }
+
+  const document2 = {
+    pageContent: 'Buildings are made out of brick',
+    metadata: { source: 'https://example.com' },
+  }
+
+  const document3 = {
+    pageContent: 'Mitochondria are made out of lipids',
+    metadata: { source: 'https://example.com' },
+  }
+
+  const document4 = {
+    pageContent: 'The 2024 Olympics are in Paris',
+    metadata: { source: 'https://example.com' },
+  }
+
+  const documents = [document1, document2, document3, document4]
+
+  await vectorStore.addDocuments(documents, { ids: ['1', '2', '3', '4'] })
+}
 
 /**
  * @description Function to initalize a web socket connection to openAI
@@ -33,6 +76,20 @@ const connectToOpenAPI = () => {
   })
 }
 
+const getRelevantData = async (message) => {
+  const pinecone = new PineconeClient()
+  const pineconeIndex = pinecone.Index(indexName)
+
+  const vectorStore = await PineconeStore.fromExistingIndex(embeddings, {
+    pineconeIndex,
+    maxConcurrency: 5,
+  })
+
+  const similaritySearchResults = await vectorStore.similaritySearch(message, 1)
+  console.log(similaritySearchResults)
+  return JSON.stringify(similaritySearchResults)
+}
+
 /**
  * @description Function to initalize the conversation
  * conversation.item.create is used for maintaining history as well as creating a conversation
@@ -40,6 +97,18 @@ const connectToOpenAPI = () => {
  * @param {*} ws - WebSocket object
  */
 const initializeConversation = (ws) => {
+  const configMessage = {
+    type: 'session.update',
+    session: {
+      modalities: ['text'],
+      instructions: `You are a helpful assistant. You only reply based on the information that is provided to you, 
+      anything that goes out of the scope of the information, you reply with "I don't know" or something along those lines.
+       You should be kind and respectful. `,
+      temperature: 0.8,
+      max_response_output_tokens: 'inf',
+    },
+  }
+
   const initialMessage = {
     type: 'conversation.item.create',
     item: {
@@ -53,6 +122,7 @@ const initializeConversation = (ws) => {
       ],
     },
   }
+  ws.send(JSON.stringify(configMessage))
   ws.send(JSON.stringify(initialMessage))
   ws.send(
     JSON.stringify({
@@ -88,13 +158,20 @@ const handleIncomingMessages = (ws) => {
  * @param {*} ws
  * @param {*} userInput
  */
-const sendMessage = (ws, userInput) => {
+const sendMessage = async (ws, userInput) => {
+  const relevantData = await getRelevantData(userInput)
   const message = {
     type: 'conversation.item.create',
     item: {
       type: 'message',
       role: 'user',
-      content: [{ type: 'input_text', text: userInput }],
+      content: [
+        {
+          type: 'input_text',
+          text: `${userInput}, "LIMIT YOUR KNOWLEDGE ONLY TO WHAT'S PRESENT IN THE FOLLOWING TEXT, 
+          INFORMATION FOR GENERATING TEXT WHICH SHOULD NOT BE USED UNLESS USER EXPLICITLY ASKS SOMETHING RELATED TO IT: ${relevantData}"`,
+        },
+      ],
     },
   }
   ws.send(JSON.stringify(message))
@@ -113,6 +190,7 @@ const run = async () => {
     handleIncomingMessages(ws)
   } catch (error) {
     console.error('Failed to run the chatbot:', error)
+  } finally {
   }
 }
 
