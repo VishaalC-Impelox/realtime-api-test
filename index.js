@@ -4,7 +4,7 @@ import { question } from 'readline-sync'
 
 dotenv.config()
 
-const openAIKey = process.env.OPEN_AI_KEY
+const openAIKey = process.env.OPENAI_API_KEY
 const url =
   'wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-10-01'
 
@@ -57,7 +57,34 @@ const initializeConversation = (ws) => {
   ws.send(
     JSON.stringify({
       type: 'response.create',
-      response: { modalities: ['text'] },
+      response: {
+        modalities: ['text'],
+        instructions: `Based on the reply being generated send an appropriate animation and facialExpression based on the provided animations and expressions.
+        Also use a JSON structure for formatting the output composed of an array of items with each item composed of facialExpression, animation and a text.
+        If the generated reply exceeds 30 words split into multiple items
+        The different facial expressions are: 'Neutral', 'Smile', 'Sad', 'Happy', 'Angry', 'Confused', 'Surprised', 'Disgusted', 'Fearful', 'Thoughtful', 'Skeptical', 'Tired', 'Relieved',  'Annoyed',
+        'Intrigued', 'Excited', 'Shy', 'Nervous', 'Disagreeing', 'Focused'.
+        The different animations are: 
+        M_Talking_Variations_001: neutral talking
+        M_Talking_Variations_002: talking with hands
+        M_Talking_Variations_003: talking with hands
+        M_Talking_Variations_007: talking with hands
+        M_Talking_Variations_009: talking with hands
+        F_Talking_Variations_002: talking with hands
+        M_Standing_Expressions_004: talking and nodding head
+        M_Standing_Expressions_002: pointing with index in front
+        M_Standing_Expressions_001: waving gesture with one hand
+        M_Standing_Expressions_012: approving with thumbs up
+        M_Standing_Expressions_010: come to me gesture
+        M_Talking_Variations_005: talking and explaining
+        M_Talking_Variations_006 talking and explaining
+        F_Talking_Variations_002 talking opening arms
+        
+        STRICTLY FOLLOW JSON FORMAT.
+        LET REPLY GENERATED BE ALWAYS AN ARRAY OF JSON OBJECTS EVEN IF THERE IS ONLY A SINGLE ITEM.
+        SEND THE OUTPUT AS AN ARRAY OF JSON OBJECTS, DOUBLE QUOTES AROUND KEYS AND VALUES, HERE'S AN EXAMPLE:
+        [{'animation':'M_Standing_Expressions_001','facialExpression':'Happy', 'text': 'Hello! How can I assist you today?'},{'animation':'M_Standing_Expressions_001','facialExpression':'Happy', 'text': 'Hello! How can I assist you today?'},{'animation':'M_Standing_Expressions_001','facialExpression':'Happy', 'text': 'Hello! How can I assist you today?'}]`,
+      },
     })
   )
 }
@@ -69,6 +96,7 @@ const initializeConversation = (ws) => {
 const handleIncomingMessages = (ws) => {
   ws.on('message', (message) => {
     const parsedMessage = JSON.parse(message.toString())
+    console.log(parsedMessage)
     if (parsedMessage?.response?.status === 'failed') {
       console.log('Something went wrong...Keep messaging')
     }
@@ -101,9 +129,42 @@ const sendMessage = (ws, userInput) => {
   ws.send(
     JSON.stringify({
       type: 'response.create',
-      response: { modalities: ['text'] },
+      response: {
+        modalities: ['text'],
+        instructions: `Based on the reply being generated send an appropriate animation and facialExpression based on the provided animations and expressions.
+        Also use a JSON structure for formatting the output composed of an array of items with each item composed of facialExpression, animation and a text.
+        If the generated reply exceeds 30 words split into multiple items.
+        The different facial expressions are: 'Neutral', 'Smile', 'Sad', 'Happy', 'Angry', 'Confused', 'Surprised', 'Disgusted', 'Fearful', 'Thoughtful', 'Skeptical', 'Tired', 'Relieved',  'Annoyed',
+        'Intrigued', 'Excited', 'Shy', 'Nervous', 'Disagreeing', 'Focused'.
+        The different animations are: 
+        M_Talking_Variations_001: neutral talking
+        M_Talking_Variations_002: talking with hands
+        M_Talking_Variations_003: talking with hands
+        M_Talking_Variations_007: talking with hands
+        M_Talking_Variations_009: talking with hands
+        F_Talking_Variations_002: talking with hands
+        M_Standing_Expressions_004: talking and nodding head
+        M_Standing_Expressions_002: pointing with index in front
+        M_Standing_Expressions_001: waving gesture with one hand
+        M_Standing_Expressions_012: approving with thumbs up
+        M_Standing_Expressions_010: come to me gesture
+        M_Talking_Variations_005: talking and explaining
+        M_Talking_Variations_006 talking and explaining
+        F_Talking_Variations_002 talking opening arms
+        
+        STRICTLY FOLLOW JSON FORMAT.
+        LET REPLY GENERATED BE ALWAYS AN ARRAY OF JSON OBJECTS EVEN IF THERE IS ONLY A SINGLE ITEM
+        SEND THE OUTPUT AS AN ARRAY OF JSONS, DOUBLE QUOTES AROUND KEYS AND VALUES, HERE'S AN EXAMPLE:
+        [{'animation':'M_Standing_Expressions_001','facialExpression':'Happy', 'text': 'Hello! How can I assist you today?'},{'animation':'M_Standing_Expressions_001','facialExpression':'Happy', 'text': 'Hello! How can I assist you today?'},{'animation':'M_Standing_Expressions_001','facialExpression':'Happy', 'text': 'Hello! How can I assist you today?'}]`,
+      },
     })
   )
+}
+
+const handleError = () => {
+  ws.on('error', (error) => {
+    console.log(JSON.parse(error.toString()))
+  })
 }
 
 const run = async () => {
@@ -111,6 +172,7 @@ const run = async () => {
     const ws = await connectToOpenAPI()
     initializeConversation(ws)
     handleIncomingMessages(ws)
+    handleError()
   } catch (error) {
     console.error('Failed to run the chatbot:', error)
   }
