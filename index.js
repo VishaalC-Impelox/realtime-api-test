@@ -4,12 +4,10 @@ import { question } from 'readline-sync'
 import { OpenAIEmbeddings } from '@langchain/openai'
 import { PineconeStore } from '@langchain/pinecone'
 import { Pinecone as PineconeClient } from '@pinecone-database/pinecone'
-import { Document } from '@langchain/core/documents'
 
 dotenv.config()
 
 const openAIKey = process.env.OPENAI_API_KEY
-const pineconeKey = process.env.PINECONE_KEY
 const indexName = process.env.PINECONE_INDEX
 const url =
   'wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-10-01'
@@ -76,6 +74,11 @@ const connectToOpenAPI = () => {
   })
 }
 
+/**
+ * Uses langchain to retreive relevant data from the vector store
+ * @param {*} message - input sent from user
+ * @returns JSON string containing textual information
+ */
 const getRelevantData = async (message) => {
   const pinecone = new PineconeClient()
   const pineconeIndex = pinecone.Index(indexName)
@@ -86,7 +89,6 @@ const getRelevantData = async (message) => {
   })
 
   const similaritySearchResults = await vectorStore.similaritySearch(message, 1)
-  console.log(similaritySearchResults)
   return JSON.stringify(similaritySearchResults)
 }
 
@@ -102,8 +104,8 @@ const initializeConversation = (ws) => {
     session: {
       modalities: ['text'],
       instructions: `You are a helpful assistant. You only reply based on the information that is provided to you, 
-      anything that goes out of the scope of the information, you reply with "I don't know" or something along those lines.
-       You should be kind and respectful. `,
+        anything that goes out of the scope of the information, you reply with "I don't know" or something along those lines.
+       You should be kind and respectful, however you are also allowed to reference history and answer if information is available in history`,
       temperature: 0.8,
       max_response_output_tokens: 'inf',
     },
@@ -143,6 +145,7 @@ const handleIncomingMessages = (ws) => {
       console.log('Something went wrong...Keep messaging')
     }
     if (parsedMessage?.type == 'response.done') {
+      console.log('Usage Details:', parsedMessage?.response?.usage)
       console.log(
         'Received message:',
         parsedMessage?.response?.output?.[0]?.content
@@ -168,7 +171,7 @@ const sendMessage = async (ws, userInput) => {
       content: [
         {
           type: 'input_text',
-          text: `${userInput}, "LIMIT YOUR KNOWLEDGE ONLY TO WHAT'S PRESENT IN THE FOLLOWING TEXT, 
+          text: `${userInput}, "THIS TEXT ISN'T PROVIDED BY THE USER, DO NOT REFERENCE IT IN YOUR REPLIES. LIMIT YOUR KNOWLEDGE ONLY TO WHAT'S PRESENT IN THE FOLLOWING TEXT, 
           INFORMATION FOR GENERATING TEXT WHICH SHOULD NOT BE USED UNLESS USER EXPLICITLY ASKS SOMETHING RELATED TO IT: ${relevantData}"`,
         },
       ],
