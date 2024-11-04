@@ -40,26 +40,11 @@ const connectToOpenAPI = () => {
  * @param {*} ws - WebSocket object
  */
 const initializeConversation = (ws) => {
-  const initialMessage = {
-    type: 'conversation.item.create',
-    item: {
-      type: 'message',
-      role: 'user',
-      content: [
-        {
-          type: 'input_text',
-          text: 'Hello',
-        },
-      ],
-    },
-  }
-  ws.send(JSON.stringify(initialMessage))
-  ws.send(
-    JSON.stringify({
-      type: 'response.create',
-      response: {
-        modalities: ['text'],
-        instructions: `Based on the reply being generated send an appropriate animation and facialExpression based on the provided animations and expressions.
+  const configMessage = {
+    type: 'session.update',
+    session: {
+      modalities: ['text'],
+      instructions: `Based on the reply being generated send an appropriate animation and facialExpression based on the provided animations and expressions.
         Also use a JSON structure for formatting the output composed of an array of items with each item composed of facialExpression, animation and a text.
         If the generated reply exceeds 30 words split into multiple items
         The different facial expressions are: 'Neutral', 'Smile', 'Sad', 'Happy', 'Angry', 'Confused', 'Surprised', 'Disgusted', 'Fearful', 'Thoughtful', 'Skeptical', 'Tired', 'Relieved',  'Annoyed',
@@ -83,7 +68,40 @@ const initializeConversation = (ws) => {
         STRICTLY FOLLOW JSON FORMAT.
         LET REPLY GENERATED BE ALWAYS AN ARRAY OF JSON OBJECTS EVEN IF THERE IS ONLY A SINGLE ITEM.
         SEND THE OUTPUT AS AN ARRAY OF JSON OBJECTS, DOUBLE QUOTES AROUND KEYS AND VALUES, HERE'S AN EXAMPLE:
-        [{'animation':'M_Standing_Expressions_001','facialExpression':'Happy', 'text': 'Hello! How can I assist you today?'},{'animation':'M_Standing_Expressions_001','facialExpression':'Happy', 'text': 'Hello! How can I assist you today?'},{'animation':'M_Standing_Expressions_001','facialExpression':'Happy', 'text': 'Hello! How can I assist you today?'}]`,
+        [{"animation":"M_Standing_Expressions_001","facialExpression":"Happy", "text": "Hello! How can I assist you today?"},{"animation":"M_Standing_Expressions_001","facialExpression":"Happy", "text": "Hello! How can I assist you today?"},{"animation":"M_Standing_Expressions_001","facialExpression":"Happy", "text": "Hello! How can I assist you today?"}]`,
+      temperature: 0.6,
+      max_response_output_tokens: 'inf',
+    },
+  }
+
+  const initialMessage = {
+    type: 'conversation.item.create',
+    item: {
+      type: 'message',
+      role: 'user',
+      content: [
+        {
+          type: 'input_text',
+          text: 'Hello',
+        },
+      ],
+    },
+  }
+  ws.send(JSON.stringify(configMessage))
+  ws.send(JSON.stringify(initialMessage))
+  ws.send(
+    JSON.stringify({
+      type: 'response.create',
+      response: { modalities: ['text'] },
+    })
+  )
+
+  ws.send(JSON.stringify(initialMessage))
+  ws.send(
+    JSON.stringify({
+      type: 'response.create',
+      response: {
+        modalities: ['text'],
       },
     })
   )
@@ -131,31 +149,6 @@ const sendMessage = (ws, userInput) => {
       type: 'response.create',
       response: {
         modalities: ['text'],
-        instructions: `Based on the reply being generated send an appropriate animation and facialExpression based on the provided animations and expressions.
-        Also use a JSON structure for formatting the output composed of an array of items with each item composed of facialExpression, animation and a text.
-        If the generated reply exceeds 30 words split into multiple items.
-        The different facial expressions are: 'Neutral', 'Smile', 'Sad', 'Happy', 'Angry', 'Confused', 'Surprised', 'Disgusted', 'Fearful', 'Thoughtful', 'Skeptical', 'Tired', 'Relieved',  'Annoyed',
-        'Intrigued', 'Excited', 'Shy', 'Nervous', 'Disagreeing', 'Focused'.
-        The different animations are: 
-        M_Talking_Variations_001: neutral talking
-        M_Talking_Variations_002: talking with hands
-        M_Talking_Variations_003: talking with hands
-        M_Talking_Variations_007: talking with hands
-        M_Talking_Variations_009: talking with hands
-        F_Talking_Variations_002: talking with hands
-        M_Standing_Expressions_004: talking and nodding head
-        M_Standing_Expressions_002: pointing with index in front
-        M_Standing_Expressions_001: waving gesture with one hand
-        M_Standing_Expressions_012: approving with thumbs up
-        M_Standing_Expressions_010: come to me gesture
-        M_Talking_Variations_005: talking and explaining
-        M_Talking_Variations_006 talking and explaining
-        F_Talking_Variations_002 talking opening arms
-        
-        STRICTLY FOLLOW JSON FORMAT.
-        LET REPLY GENERATED BE ALWAYS AN ARRAY OF JSON OBJECTS EVEN IF THERE IS ONLY A SINGLE ITEM
-        SEND THE OUTPUT AS AN ARRAY OF JSONS, DOUBLE QUOTES AROUND KEYS AND VALUES, HERE'S AN EXAMPLE:
-        [{'animation':'M_Standing_Expressions_001','facialExpression':'Happy', 'text': 'Hello! How can I assist you today?'},{'animation':'M_Standing_Expressions_001','facialExpression':'Happy', 'text': 'Hello! How can I assist you today?'},{'animation':'M_Standing_Expressions_001','facialExpression':'Happy', 'text': 'Hello! How can I assist you today?'}]`,
       },
     })
   )
